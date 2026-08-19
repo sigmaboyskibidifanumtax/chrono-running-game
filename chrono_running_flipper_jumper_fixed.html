@@ -240,182 +240,240 @@ const player=document.getElementById("runner");
 const arena=document.getElementById("arena");
 const message=document.getElementById("message");
 
+// initialize UI money display
+updateMoney();
 
 function updateMoney(){
-
-coinsText.textContent=Math.floor(coins);
-gemsText.textContent=Math.floor(gems);
-
+  coinsText.textContent=Math.floor(coins);
+  gemsText.textContent=Math.floor(gems);
 }
-
 
 function home(){
+  running=false;
 
-running=false;
+  homeScreen.classList.remove("hide");
+  runnerScreen.classList.add("hide");
 
-homeScreen.classList.remove("hide");
-runnerScreen.classList.add("hide");
-
-document.querySelectorAll(".obstacle,.coin").forEach(
-x=>x.remove()
-);
-
+  // remove any active obstacles/coins
+  document.querySelectorAll(".obstacle,.coin").forEach(
+    x=>x.remove()
+  );
 }
-
 
 function startRunner(){
+  homeScreen.classList.add("hide");
+  runnerScreen.classList.remove("hide");
 
-homeScreen.classList.add("hide");
-runnerScreen.classList.remove("hide");
+  running=true;
+  jumping=false;
+  score=0;
+  playerX=80;
 
-running=true;
-jumping=false;
-score=0;
-playerX=80;
+  player.style.left=playerX+"px";
+  player.style.bottom="110px";
 
-player.style.left=playerX+"px";
-player.style.bottom="110px";
+  message.textContent="Score: 0";
 
-message.textContent="Score: 0";
-
-spawnObstacle();
-runnerLoop();
-
+  // start spawns and loop
+  spawnObstacle();
+  // start occasional coin spawns as well
+  spawnCoin();
+  runnerLoop();
 }
-
 
 function runnerLoop(){
+  if(!running) return;
 
-if(!running)return;
+  score++;
 
-score++;
+  message.textContent =
+    "🏃 Score: "+score+"   🪙 "+Math.floor(coins);
 
-message.textContent=
-"🏃 Score: "+score+"   🪙 "+coins;
+  // occasionally spawn coins in addition to the spawnCoin's own scheduling
+  if(Math.random() < 0.03){
+    spawnCoin();
+  }
 
-if(Math.random()<0.03){
-
-spawnCoin();
-
+  setTimeout(runnerLoop,100);
 }
-
-setTimeout(runnerLoop,100);
-
-}
-
 
 function spawnObstacle(){
+  if(!running) return;
 
-if(!running)return;
+  let obstacle=document.createElement("div");
+  obstacle.className="obstacle";
+  obstacle.style.left="100%";
+  arena.appendChild(obstacle);
 
-let obstacle=document.createElement("div");
+  let x=100;
 
-obstacle.className="obstacle";
+  let timer=setInterval(()=>{
 
-obstacle.style.left="100%";
+    if(!running){
+      clearInterval(timer);
+      obstacle.remove();
+      return;
+    }
 
-arena.appendChild(obstacle);
+    x-=1.2;
+    obstacle.style.left=x+"%";
 
-let x=100;
+    let obstaclePixel = arena.clientWidth * x / 100;
+    let playerRight = playerX + 45;
 
-let timer=setInterval(()=>{
+    if(
+      obstaclePixel < playerRight &&
+      obstaclePixel > playerX - 20 &&
+      !jumping
+    ){
+      running=false;
 
-if(!running){
+      alert(
+        "💥 BONK!\n\nScore: "+score
+      );
 
-clearInterval(timer);
-obstacle.remove();
-return;
+      home();
 
+      clearInterval(timer);
+      return;
+    }
+
+    if(x < -10){
+      // obstacle passed off-screen, reward small coin
+      coins += 2;
+      updateMoney();
+
+      clearInterval(timer);
+      obstacle.remove();
+      return;
+    }
+
+  },16);
+
+  setTimeout(
+    spawnObstacle,
+    1500 + Math.random() * 1500
+  );
 }
-
-x-=1.2;
-
-obstacle.style.left=x+"%";
-
-
-let obstaclePixel=
-arena.clientWidth*x/100;
-
-
-let playerRight=
-playerX+45;
-
-
-if(
-obstaclePixel<playerRight &&
-obstaclePixel>playerX-20 &&
-!jumping
-){
-
-running=false;
-
-alert(
-"💥 BONK!\n\nScore: "+score
-);
-
-home();
-
-clearInterval(timer);
-
-}
-
-
-if(x<-10){
-
-coins+=2;
-
-updateMoney();
-
-clearInterval(timer);
-
-obstacle.remove();
-
-}
-
-},16);
-
-
-setTimeout(
-spawnObstacle,
-1500+Math.random()*1500
-);
-
-}
-
 
 function spawnCoin(){
+  if(!running) return;
 
-if(!running)return;
+  let coin=document.createElement("div");
+  coin.className="coin";
+  coin.textContent="🪙";
+  coin.style.left="100%";
+  arena.appendChild(coin);
 
-let coin=document.createElement("div");
+  let x=100;
 
-coin.className="coin";
+  let timer=setInterval(()=>{
 
-coin.textContent="🪙";
+    if(!running){
+      clearInterval(timer);
+      coin.remove();
+      return;
+    }
 
-coin.style.left="100%";
+    x -= 1.3;
+    coin.style.left = x + "%";
 
-arena.appendChild(coin);
+    // convert percent to pixel position for reliable collision check
+    let coinPixel = arena.clientWidth * x / 100;
+    let playerRight = playerX + 45;
 
-let x=100;
+    // collision/pickup detection similar to obstacles
+    if(coinPixel < playerRight && coinPixel > playerX - 20){
+      coins += 5;
+      clearInterval(timer);        // fixed spelling and case
+      coin.remove();              // remove coin from DOM
+      updateMoney();              // refresh UI
+      return;
+    }
 
-let timer=setInterval(()=>{
+    // cleanup if coin moves off screen
+    if(x < -10){
+      clearInterval(timer);
+      coin.remove();
+      return;
+    }
 
-if(!running){
+  },16);
 
-clearInterval(timer);
-coin.remove();
-return;
-
+  // schedule another coin in the future (staggered)
+  setTimeout(spawnCoin, 2000 + Math.random() * 2000);
 }
 
-x-=1.3;
+// Minimal runner control implementations
 
-coin.style.left=x+"%";
+function jump(){
+  if(!running) return;
+  if(jumping) return;
+  jumping = true;
+  let up = 0;
+  // move up
+  const jumpTimer = setInterval(()=>{
+    up += 12;
+    player.style.bottom = (110 + up) + "px";
+    if(up >= 140){
+      clearInterval(jumpTimer);
+      // fall back down
+      const fallTimer = setInterval(()=>{
+        up -= 14;
+        player.style.bottom = (110 + Math.max(0, up)) + "px";
+        if(up <= 0){
+          clearInterval(fallTimer);
+          player.style.bottom = "110px";
+          jumping = false;
+        }
+      }, 16);
+    }
+  }, 16);
+}
 
+function left(){
+  if(!running) return;
+  // move left by a chunk and clamp to 0
+  playerX = Math.max(0, playerX - 40);
+  player.style.left = playerX + "px";
+}
 
-if(x<15 && x>3){
+function right(){
+  if(!running) return;
+  // limit right movement so player stays in arena
+  const maxX = Math.max(0, arena.clientWidth - 60);
+  playerX = Math.min(maxX, playerX + 40);
+  player.style.left = playerX + "px";
+}
 
-coins+=5;
-ClearInteral(timer)
-updateMoney();
+// Stubs for other game modes / buttons.
+// Implement these properly later. For now they are safe no-ops or simple alerts.
+
+function flipper(){
+  alert("Flipper mode not implemented yet.");
+}
+
+function pizza(){
+  alert("Pizza puzzle mode not implemented yet.");
+}
+
+function egypt(){
+  alert("Egypt event not implemented yet.");
+}
+
+function tycoon(){
+  alert("Tycoon mode not implemented yet.");
+}
+
+function dogMaze(){
+  alert("Dog Maze mode not implemented yet.");
+}
+
+function collab(){
+  alert("Collaboration reward not implemented yet.");
+}
+
+</script>
+
+</body>
+</html>
